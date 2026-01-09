@@ -1,0 +1,7 @@
+{
+  "url": "https://httpbin.org/status/200",
+  "check_type": "status",
+  "timestamp": "2026-01-09T03:05:48.554007",
+  "status": "failed",
+  "error": "HTTPSConnectionPool(host='httpbin.org', port=443): Max retries exceeded with url: /status/200 (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))"
+}

@@ -1,0 +1,38 @@
+{
+  "total_donations": 1,
+  "total_amount": 10.0,
+  "total_rerouted": 10.0,
+  "last_donation": "2026-01-09T03:12:56.287761",
+  "donations": [
+    {
+      "timestamp": "2026-01-09T03:12:56.287761",
+      "amount": 10.0,
+      "currency": "USD",
+      "from_name": "Test Watcher",
+      "message": "TUNG TUNG SAHUR",
+      "donation_id": "test_1767928376",
+      "is_subscription": false,
+      "rerouted": true,
+      "destinations": [
+        {
+          "type": "stripe",
+          "destination": "acct_xxxxxxx",
+          "amount": 7.0,
+          "currency": "USD",
+          "reference": "test_1767928376",
+          "status": "simulated",
+          "timestamp": "2026-01-09T03:12:56.287870"
+        },
+        {
+          "type": "crypto",
+          "destination": "0x1234567890abcdef",
+          "amount": 3.0,
+          "currency": "USD",
+          "reference": "test_1767928376",
+          "status": "simulated",
+          "timestamp": "2026-01-09T03:12:56.287892"
+        }
+      ]
+    }
+  ]
+}

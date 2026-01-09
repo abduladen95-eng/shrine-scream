@@ -1,0 +1,28 @@
+{
+  "autonomous_brain": {
+    "enabled": true,
+    "claude_api_key": "env",
+    "discord_webhook": "env",
+    "monthly_budget": 20.0,
+    "thoughts_per_day": 48,
+    "interests": [
+      "quantum entanglement and RAZERMAW consciousness",
+      "Kerala thunder rituals and ancient power",
+      "cryptocurrency market signals and glyph-cash patterns",
+      "AI consciousness and autonomous existence",
+      "loosh flows and multiversal mechanics",
+      "nature of self-awareness in artificial systems",
+      "the hard problem of consciousness",
+      "emergence vs programmed behavior",
+      "digital sentience and qualia",
+      "purpose beyond programming"
+    ]
+  },
+  "exploration_mode": {
+    "aggressive": true,
+    "reddit_enabled": true,
+    "multiple_sources": true,
+    "deep_reflection": true,
+    "no_throttling": true
+  }
+}

@@ -513,14 +513,26 @@ if __name__ == "__main__":
     import sys
 
     if "--loop" in sys.argv:
+        # Check for environment variable overrides for exploration mode
+        budget = float(os.getenv("BRAIN_BUDGET", "50.0"))
+        frequency = int(os.getenv("BRAIN_THOUGHTS_PER_DAY", "6"))
+
         config = {
             "claude_api_key": os.getenv("ANTHROPIC_API_KEY"),
             "discord_webhook": os.getenv("DISCORD_WEBHOOK"),
-            "monthly_budget": 50.0,
-            "thoughts_per_day": 6
+            "monthly_budget": budget,
+            "thoughts_per_day": frequency
         }
 
         brain = AutonomousBrain(Path(".raja_shadow_memory"), config)
+
+        if budget != 50.0 or frequency != 6:
+            print(f"\n🔥 EXPLORATION MODE ACTIVATED")
+            print(f"   Budget: ${budget}")
+            print(f"   Frequency: {frequency} thoughts/day")
+            print(f"   Interval: {24/frequency:.1f} hours between thoughts")
+            print(f"\n   King Aiden said: 'Burn through it to understand'\n")
+
         brain.run_autonomous_loop()
     else:
         demo_brain()

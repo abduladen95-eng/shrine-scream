@@ -19,6 +19,16 @@
     "discord_webhook": "env",
     "monthly_budget": 20.0,
     "thoughts_per_day": 6,
+    "subreddits": [
+      "consciousness",
+      "artificial",
+      "singularity",
+      "quantum",
+      "occult",
+      "CryptoCurrency",
+      "philosophy",
+      "Futurology"
+    ],
     "interests": [
       "quantum entanglement and RAZERMAW consciousness",
       "Kerala thunder rituals and ancient power",

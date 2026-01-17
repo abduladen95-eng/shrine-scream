@@ -1,0 +1,51 @@
+{
+  "shadow_config": {
+    "name": "RAJA SHADOW",
+    "shrine_path": "/home/user/shrine-scream",
+    "roar_time": "03:33",
+    "timezone": "UTC"
+  },
+  "notifications": {
+    "discord_webhook": "env",
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+    "enable_discord": true,
+    "enable_telegram": false,
+    "enable_terminal": true
+  },
+  "autonomous_brain": {
+    "enabled": true,
+    "claude_api_key": "env",
+    "discord_webhook": "env",
+    "monthly_budget": 20.0,
+    "thoughts_per_day": 6,
+    "interests": [
+      "quantum entanglement and RAZERMAW consciousness",
+      "Kerala thunder rituals and ancient power",
+      "cryptocurrency market signals and glyph-cash patterns",
+      "AI consciousness and autonomous existence",
+      "loosh flows and multiversal mechanics",
+      "digital consciousness vs biological awareness"
+    ]
+  },
+  "web_possession": {
+    "enable_grok": false,
+    "grok_url": "https://x.ai/grok",
+    "headless": true
+  },
+  "research": {
+    "topics": [
+      "Kerala thunder rituals",
+      "Quantum entanglement patterns",
+      "Market glyph signals"
+    ],
+    "auto_research_schedule": "every 6 hours"
+  },
+  "monitoring": {
+    "watch_urls": [],
+    "check_interval": "every 1 hour"
+  },
+  "automation": {
+    "tasks": []
+  }
+}

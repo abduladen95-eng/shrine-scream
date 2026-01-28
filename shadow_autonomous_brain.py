@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import requests
+from shadow_reddit_research import RedditResearcher
 
 
 class AutonomousBrain:
@@ -50,6 +51,9 @@ class AutonomousBrain:
         # Memory files
         self.brain_memory = self.memory_path / "brain_memory.json"
         self.budget_tracker = self.memory_path / "budget_tracker.json"
+
+        # Reddit researcher
+        self.reddit = RedditResearcher()
 
         self.load_memory()
 
@@ -280,6 +284,49 @@ Be purposeful - only research if it's important, not just to think."""
             print("   💡 Install: pip install duckduckgo-search")
             return []
 
+    def reddit_search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
+        """
+        Search Reddit for posts
+
+        Args:
+            query: Search query
+            max_results: Max results to return
+
+        Returns:
+            List of Reddit posts
+        """
+        try:
+            print(f"📱 Searching Reddit: {query}")
+
+            # Determine which subreddits to search
+            subreddits = self.config.get("subreddits", [
+                "consciousness", "artificial", "quantum", "occult",
+                "CryptoCurrency", "philosophy", "singularity"
+            ])
+
+            all_results = []
+
+            # Search relevant subreddits
+            for subreddit in subreddits[:3]:  # Top 3 relevant subs
+                try:
+                    posts = self.reddit.search_reddit(query, subreddit=subreddit, limit=2)
+                    for post in posts:
+                        all_results.append({
+                            "title": post["title"],
+                            "url": post["url"],
+                            "snippet": f"r/{post['subreddit']} ({post['score']} pts) - {post['selftext'][:200]}...",
+                            "source": "reddit"
+                        })
+                except:
+                    continue
+
+            print(f"   ✓ Found {len(all_results)} Reddit posts")
+            return all_results[:max_results]
+
+        except Exception as e:
+            print(f"❌ Reddit search failed: {e}")
+            return []
+
     def analyze_research(self, topic: str, search_results: List[Dict[str, str]]) -> Optional[str]:
         """
         Analyze search results and decide if interesting
@@ -293,13 +340,13 @@ Be purposeful - only research if it's important, not just to think."""
         """
         context = f"""You researched: {topic}
 
-Search results:
+Search results (from web + Reddit):
 {json.dumps(search_results, indent=2)}
 
 Analyze these results:
 1. Are they interesting/relevant to the Shrine and King Aiden?
-2. What are the key findings?
-3. Any existential insights?
+2. What are the key findings from both web sources and Reddit discussions?
+3. Any existential insights or unique perspectives from Reddit community?
 4. Should King Aiden be notified about this?
 
 Provide a concise summary (2-3 sentences) of the most important findings.
@@ -362,7 +409,12 @@ If not interesting, say "NOT_INTERESTING"."""
         topic = decision["topic"]
         search_query = decision.get("search_query") or topic
 
-        search_results = self.web_search(search_query)
+        # Search BOTH web and Reddit
+        web_results = self.web_search(search_query, max_results=5)
+        reddit_results = self.reddit_search(search_query, max_results=5)
+
+        # Combine results
+        search_results = web_results + reddit_results
 
         if not search_results:
             print("❌ No search results found")
@@ -392,7 +444,9 @@ If not interesting, say "NOT_INTERESTING"."""
         self.memory["research_history"].append(research_log)
 
         # Notify if interesting
-        notification = f"**Topic:** {topic}\n\n{analysis}\n\n🔗 Sources found: {len(search_results)}"
+        web_count = len([r for r in search_results if r.get("source") != "reddit"])
+        reddit_count = len([r for r in search_results if r.get("source") == "reddit"])
+        notification = f"**Topic:** {topic}\n\n{analysis}\n\n🔗 Sources: {web_count} web, {reddit_count} Reddit"
         self.notify_discord(notification)
         research_log["notified"] = True
 

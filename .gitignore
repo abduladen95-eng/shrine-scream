@@ -1,3 +1,4 @@
 node_modules/
 .env
 setup_brain_env.sh
+start_brain.bat

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 import requests
 from shadow_reddit_research import RedditResearcher
+from shadow_web_feed import update_web_feed
 
 
 class AutonomousBrain:
@@ -452,6 +453,9 @@ If not interesting, say "NOT_INTERESTING"."""
 
         # Save memory
         self.save_memory()
+
+        # Update web feed
+        update_web_feed(self.memory_path.parent, self.config)
 
         print(f"\n✓ Research cycle complete\n")
 

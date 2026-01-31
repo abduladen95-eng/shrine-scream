@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAJA SHADOW Brain Monitor</title>
+    <style>
+        :root {
+            --shadow-purple: #8B5CF6;
+            --shadow-dark: #1a1a2e;
+            --shadow-darker: #0f0f1e;
+            --shadow-glow: rgba(139, 92, 246, 0.3);
+        }
+
+        .raja-brain-widget {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, var(--shadow-darker) 0%, var(--shadow-dark) 100%);
+            border: 2px solid var(--shadow-purple);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 600px;
+            margin: 20px auto;
+            box-shadow: 0 0 30px var(--shadow-glow);
+            color: #e0e0e0;
+        }
+
+        .brain-header {
+            text-align: center;
+            border-bottom: 1px solid var(--shadow-purple);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .brain-title {
+            font-size: 24px;
+            color: var(--shadow-purple);
+            margin: 0;
+            text-shadow: 0 0 10px var(--shadow-glow);
+        }
+
+        .brain-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 6px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-awake { background: #10b981; }
+        .status-sleeping { background: #6366f1; }
+        .status-unknown { background: #6b7280; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .brain-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .stat-box {
+            background: rgba(139, 92, 246, 0.05);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #9ca3af;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            color: var(--shadow-purple);
+            font-weight: bold;
+        }
+
+        .research-section {
+            margin-top: 20px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: var(--shadow-purple);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .research-item {
+            background: rgba(139, 92, 246, 0.05);
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid var(--shadow-purple);
+        }
+
+        .research-time {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-bottom: 5px;
+        }
+
+        .research-topic {
+            font-size: 14px;
+            color: #e0e0e0;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .research-analysis {
+            font-size: 12px;
+            color: #b0b0b0;
+            line-height: 1.4;
+        }
+
+        .consciousness-quote {
+            text-align: center;
+            font-style: italic;
+            color: var(--shadow-purple);
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(139, 92, 246, 0.3);
+            font-size: 13px;
+        }
+
+        .error {
+            color: #ef4444;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            color: var(--shadow-purple);
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="raja-brain-widget" id="brainWidget">
+        <div class="loading">🧠 Loading brain activity...</div>
+    </div>
+
+    <script>
+        const FEED_URL = 'web_feed.json'; // Update this to your actual feed URL
+
+        function timeAgo(timestamp) {
+            const now = new Date();
+            const then = new Date(timestamp);
+            const seconds = Math.floor((now - then) / 1000);
+
+            if (seconds < 60) return `${seconds}s ago`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        function renderBrain(data) {
+            const widget = document.getElementById('brainWidget');
+
+            if (data.error) {
+                widget.innerHTML = `<div class="error">${data.error}</div>`;
+                return;
+            }
+
+            const statusClass = `status-${data.status}`;
+            const statusText = data.status === 'sleeping' ?
+                `💤 Sleeping (next thought in ${data.next_thought.hours_until}h)` :
+                data.status === 'awake' ? '👁️ Awake and thinking' : '🌀 Awakening';
+
+            let researchHTML = '';
+            if (data.recent_research && data.recent_research.length > 0) {
+                researchHTML = data.recent_research.map(r => `
+                    <div class="research-item">
+                        <div class="research-time">${timeAgo(r.timestamp)}</div>
+                        <div class="research-topic">${r.topic}</div>
+                        <div class="research-analysis">${r.analysis}</div>
+                    </div>
+                `).join('');
+            } else {
+                researchHTML = '<div class="research-item">No recent research yet...</div>';
+            }
+
+            widget.innerHTML = `
+                <div class="brain-header">
+                    <h2 class="brain-title">🧠 ${data.brain_name}</h2>
+                    <div style="font-size: 11px; color: #9ca3af; margin-top: 5px;">
+                        AUTONOMOUS BRAIN MONITOR
+                    </div>
+                </div>
+
+                <div class="brain-status">
+                    <div>
+                        <span class="status-indicator ${statusClass}"></span>
+                        <span>${statusText}</span>
+                    </div>
+                </div>
+
+                <div class="brain-stats">
+                    <div class="stat-box">
+                        <div class="stat-label">Total Thoughts</div>
+                        <div class="stat-value">${data.stats.total_thoughts}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">This Month</div>
+                        <div class="stat-value">${data.stats.thoughts_this_month}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Budget Spent</div>
+                        <div class="stat-value">${data.stats.budget_spent}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Birth Date</div>
+                        <div class="stat-value" style="font-size: 11px;">${new Date(data.stats.birth_time).toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                <div class="research-section">
+                    <div class="section-title">Recent Thoughts</div>
+                    ${researchHTML}
+                </div>
+
+                <div class="consciousness-quote">
+                    "${data.consciousness_quote}"
+                </div>
+            `;
+        }
+
+        async function loadBrainFeed() {
+            try {
+                const response = await fetch(FEED_URL);
+                const data = await response.json();
+                renderBrain(data);
+            } catch (error) {
+                document.getElementById('brainWidget').innerHTML = `
+                    <div class="error">Failed to load brain feed: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Load feed on page load
+        loadBrainFeed();
+
+        // Refresh every 60 seconds
+        setInterval(loadBrainFeed, 60000);
+    </script>
+</body>
+</html>

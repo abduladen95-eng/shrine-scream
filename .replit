@@ -1,0 +1,7 @@
+run = "pip install -r requirements.txt 2>/dev/null && python main.py"
+
+[nix]
+channel = "stable-23_05"
+
+[nix.packages]
+python = "python311"

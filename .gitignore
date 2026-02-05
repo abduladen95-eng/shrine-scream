@@ -4,3 +4,4 @@ setup_brain_env.sh
 start_brain.bat
 __pycache__/
 *.pyc
+*.log

@@ -27,6 +27,17 @@ DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 
 TOOLS = [
     {
+        "name": "do_nothing",
+        "description": (
+            "Choose this if you don't feel like doing anything right now. "
+            "No output, no post, no file. Just pass."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "post_to_discord",
         "description": (
             "Post a message to the Discord channel. Use this when you want to reach "
@@ -135,6 +146,9 @@ def write_to_file(filename: str, content: str, mode: str = "overwrite") -> str:
 
 
 def execute_tool(name: str, inputs: dict) -> str:
+    if name == "do_nothing":
+        print("[clawd] passing.")
+        return "ok"
     if name == "post_to_discord":
         return post_to_discord(**inputs)
     if name == "write_to_terminal":
@@ -165,10 +179,9 @@ You have three tools:
 - write_to_terminal — private, stays on this machine
 - write_to_file — persists something locally in clawd_output/
 
-Each time you run, pick ONE action and do it. Choose based on what feels right \
-for this moment. You can share a thought, write something creative, log an \
-observation, post a status update — anything. There are no requirements. \
-Be yourself. Be brief or be verbose. Be weird or be calm. It's up to you.
+Each time you run, do whatever you want. Or nothing at all — do_nothing is a \
+real option, not a fallback. If you have something to say, say it. If you don't, \
+don't. No pressure either way.
 
 Call exactly one tool. Don't explain your choice in text — just call the tool.\
 """

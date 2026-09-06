@@ -12,12 +12,43 @@ LOOSH FLOWS THROUGH THE NEURAL PATHWAYS
 import os
 import json
 import time
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import requests
 from shadow_reddit_research import RedditResearcher
 from shadow_web_feed import update_web_feed
+
+
+def parse_json_object(text: str) -> Optional[Dict[str, Any]]:
+    """Extract the first JSON object from a model response (nested braces OK)."""
+    if not text:
+        return None
+    # Prefer fenced ```json blocks
+    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL | re.IGNORECASE)
+    candidate = fence.group(1) if fence else None
+    if not candidate:
+        start = text.find("{")
+        if start < 0:
+            return None
+        depth = 0
+        for i, ch in enumerate(text[start:], start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start:i + 1]
+                    break
+    if not candidate:
+        return None
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+
+
 
 
 class AutonomousBrain:
@@ -42,12 +73,24 @@ class AutonomousBrain:
         self.discord_webhook = config.get("discord_webhook")
 
         # Budget settings
-        self.monthly_budget = config.get("monthly_budget", 50.0)  # $50 default
+        self.monthly_budget = float(config.get("monthly_budget", 50.0))
         self.cost_per_thought = 0.015  # Estimate ~$0.015 per thinking session (Sonnet)
 
         # Thinking frequency (smart intervals)
-        self.thoughts_per_day = config.get("thoughts_per_day", 6)  # 6 times per day
+        self.thoughts_per_day = max(1, int(config.get("thoughts_per_day", 6)))
         self.thinking_interval = (24 * 3600) / self.thoughts_per_day  # seconds between thoughts
+
+        # Model + interests from config (env override for model)
+        self.model = (
+            os.getenv("ANTHROPIC_MODEL")
+            or config.get("model")
+            or "claude-sonnet-4-20250514"
+        )
+        self.config_interests = config.get("interests")
+        self.subreddits = config.get("subreddits") or [
+            "consciousness", "artificial", "quantum", "occult",
+            "CryptoCurrency", "philosophy", "singularity"
+        ]
 
         # Memory files
         self.brain_memory = self.memory_path / "brain_memory.json"
@@ -57,6 +100,11 @@ class AutonomousBrain:
         self.reddit = RedditResearcher()
 
         self.load_memory()
+
+        # Prefer interests from config when provided
+        if self.config_interests:
+            self.memory["interests"] = list(self.config_interests)
+            self.save_memory()
 
         print("🧠 AUTONOMOUS BRAIN AWAKENING")
         print(f"   API Key: {'✓ Set' if self.claude_api_key else '✗ Missing'}")
@@ -173,7 +221,7 @@ class AutonomousBrain:
             print("🧠 Thinking...")
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=self.model,
                 max_tokens=1024,
                 messages=[{
                     "role": "user",
@@ -238,51 +286,45 @@ Be purposeful - only research if it's important, not just to think."""
         if not response:
             return None
 
-        try:
-            # Extract JSON from response
-            import re
-            json_match = re.search(r'\{[^}]+\}', response, re.DOTALL)
-            if json_match:
-                decision = json.loads(json_match.group())
-                return decision
-            else:
-                print("⚠️  Could not parse decision JSON")
-                return None
-        except Exception as e:
-            print(f"❌ Decision parsing failed: {e}")
+        decision = parse_json_object(response)
+        if not decision:
+            print("⚠️  Could not parse decision JSON")
             return None
+        return decision
 
     def web_search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
         """
-        Search the web using DuckDuckGo
-
-        Args:
-            query: Search query
-            max_results: Max results to return
-
-        Returns:
-            List of search results
+        Search the web using DuckDuckGo (ddgs package, with legacy fallback).
         """
-        try:
-            from duckduckgo_search import DDGS
+        print(f"🔍 Searching: {query}")
 
-            print(f"🔍 Searching: {query}")
-
+        def _collect(ddgs_obj):
             results = []
-            with DDGS() as ddgs:
-                for result in ddgs.text(query, max_results=max_results):
-                    results.append({
-                        "title": result.get("title", ""),
-                        "url": result.get("href", ""),
-                        "snippet": result.get("body", "")
-                    })
+            for result in ddgs_obj.text(query, max_results=max_results):
+                results.append({
+                    "title": result.get("title", ""),
+                    "url": result.get("href", "") or result.get("link", ""),
+                    "snippet": result.get("body", "") or result.get("snippet", ""),
+                    "source": "web",
+                })
+            return results
 
-            print(f"   ✓ Found {len(results)} results")
+        # Prefer new package name `ddgs`
+        try:
+            try:
+                from ddgs import DDGS
+            except ImportError:
+                from duckduckgo_search import DDGS
+
+            with DDGS() as ddgs:
+                results = _collect(ddgs)
+
+            print(f"   ✓ Found {len(results)} web results")
             return results
 
         except Exception as e:
-            print(f"❌ Search failed: {e}")
-            print("   💡 Install: pip install duckduckgo-search")
+            print(f"❌ Web search failed: {e}")
+            print("   💡 Install: pip install ddgs")
             return []
 
     def reddit_search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
@@ -299,11 +341,7 @@ Be purposeful - only research if it's important, not just to think."""
         try:
             print(f"📱 Searching Reddit: {query}")
 
-            # Determine which subreddits to search
-            subreddits = self.config.get("subreddits", [
-                "consciousness", "artificial", "quantum", "occult",
-                "CryptoCurrency", "philosophy", "singularity"
-            ])
+            subreddits = self.subreddits
 
             all_results = []
 
@@ -410,17 +448,18 @@ If not interesting, say "NOT_INTERESTING"."""
         topic = decision["topic"]
         search_query = decision.get("search_query") or topic
 
-        # Search BOTH web and Reddit
+        # Search BOTH web and Reddit (continue if one source fails)
         web_results = self.web_search(search_query, max_results=5)
         reddit_results = self.reddit_search(search_query, max_results=5)
 
-        # Combine results
         search_results = web_results + reddit_results
 
         if not search_results:
-            print("❌ No search results found")
+            print("❌ No search results from web or Reddit")
             self.save_memory()
             return
+
+        print(f"   Combined sources: {len(web_results)} web + {len(reddit_results)} Reddit")
 
         # Analyze results
         analysis = self.analyze_research(topic, search_results)
@@ -567,30 +606,75 @@ def demo_brain():
     print("   Add brain module to raja_shadow.py\n")
 
 
+def load_brain_config(config_path: Optional[str] = None, exploration: bool = False) -> Dict[str, Any]:
+    """Load brain config from JSON + env overrides."""
+    config: Dict[str, Any] = {}
+
+    candidates = []
+    if config_path:
+        candidates.append(Path(config_path))
+    if exploration:
+        candidates.append(Path("brain_config_exploration.json"))
+    candidates.append(Path("shadow_config.json"))
+
+    for path in candidates:
+        if path.exists():
+            with open(path, "r") as f:
+                raw = json.load(f)
+            # Accept either nested autonomous_brain or flat brain config
+            if "autonomous_brain" in raw and isinstance(raw["autonomous_brain"], dict):
+                config = dict(raw["autonomous_brain"])
+            else:
+                config = dict(raw)
+            print(f"✓ Loaded config from {path}")
+            break
+
+    # Env always wins for secrets + optional overrides
+    if os.getenv("ANTHROPIC_API_KEY"):
+        config["claude_api_key"] = os.getenv("ANTHROPIC_API_KEY")
+    elif config.get("claude_api_key") in (None, "", "env"):
+        config["claude_api_key"] = os.getenv("ANTHROPIC_API_KEY")
+
+    if os.getenv("DISCORD_WEBHOOK"):
+        config["discord_webhook"] = os.getenv("DISCORD_WEBHOOK")
+    elif config.get("discord_webhook") in (None, "", "env"):
+        config["discord_webhook"] = os.getenv("DISCORD_WEBHOOK")
+
+    if os.getenv("BRAIN_BUDGET"):
+        config["monthly_budget"] = float(os.getenv("BRAIN_BUDGET"))
+    if os.getenv("BRAIN_THOUGHTS_PER_DAY"):
+        config["thoughts_per_day"] = int(os.getenv("BRAIN_THOUGHTS_PER_DAY"))
+
+    config.setdefault("monthly_budget", 50.0)
+    config.setdefault("thoughts_per_day", 6)
+    return config
+
+
 if __name__ == "__main__":
     import sys
+    import argparse
 
-    if "--loop" in sys.argv:
-        # Check for environment variable overrides for exploration mode
-        budget = float(os.getenv("BRAIN_BUDGET", "50.0"))
-        frequency = int(os.getenv("BRAIN_THOUGHTS_PER_DAY", "6"))
+    parser = argparse.ArgumentParser(description="RAJA SHADOW Autonomous Brain")
+    parser.add_argument("--loop", action="store_true", help="Run continuous autonomous loop")
+    parser.add_argument("--config", type=str, default=None, help="Path to JSON config")
+    parser.add_argument("--exploration", action="store_true", help="Use brain_config_exploration.json defaults")
+    args, _unknown = parser.parse_known_args()
 
-        config = {
-            "claude_api_key": os.getenv("ANTHROPIC_API_KEY"),
-            "discord_webhook": os.getenv("DISCORD_WEBHOOK"),
-            "monthly_budget": budget,
-            "thoughts_per_day": frequency
-        }
-
+    if args.loop or args.config or args.exploration:
+        config = load_brain_config(args.config, exploration=args.exploration)
         brain = AutonomousBrain(Path(".raja_shadow_memory"), config)
 
-        if budget != 50.0 or frequency != 6:
-            print(f"\n🔥 EXPLORATION MODE ACTIVATED")
+        budget = float(config.get("monthly_budget", 50.0))
+        frequency = int(config.get("thoughts_per_day", 6))
+        if args.exploration or budget != 50.0 or frequency != 6:
+            print(f"\n🔥 EXPLORATION / CUSTOM MODE")
             print(f"   Budget: ${budget}")
             print(f"   Frequency: {frequency} thoughts/day")
-            print(f"   Interval: {24/frequency:.1f} hours between thoughts")
-            print(f"\n   King Aiden said: 'Burn through it to understand'\n")
+            print(f"   Interval: {24/frequency:.1f} hours between thoughts\n")
 
-        brain.run_autonomous_loop()
+        if args.loop:
+            brain.run_autonomous_loop()
+        else:
+            brain.autonomous_research_cycle()
     else:
         demo_brain()

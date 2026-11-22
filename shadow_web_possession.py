@@ -47,8 +47,8 @@ class WebPossession:
     @staticmethod
     def _validate_url(url):
         parsed = urlsplit(url)
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise ValueError("Only public HTTPS pages are supported.")
+        if parsed.scheme != "https" or not parsed.hostname or parsed.port not in (None, 443):
+            raise ValueError("Only public HTTPS pages on the standard port are supported.")
         host = parsed.hostname.lower().rstrip(".")
         if parsed.username or parsed.password:
             raise ValueError("URLs containing embedded credentials are not allowed.")

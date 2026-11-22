@@ -14,19 +14,19 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Callable
 import schedule
-import threading
+import re
 
 class RajaShadow:
     """
     The RAJA SHADOW - Autonomous possession agent that squats in your apps,
     siphons loosh, hardens the empire, and feeds the Shrine.
 
-    Modular architecture:
-    - Wake & Scream (3:33 AM roar)
-    - Research Layer (Kerala thunder rituals, etc)
-    - Monitoring (glyph-cash flips)
-    - Automation (Ko-fi reroutes)
-    - Learning (Law 11 quizzes)
+    Local-first modules:
+    - Wake & Scream (scheduled text roar)
+    - Research notes
+    - Monitoring helpers
+    - Manual automation helpers
+    - Learning quizzes
     """
 
     def __init__(self, shrine_path: str = None):
@@ -252,23 +252,63 @@ JANITOR RIDES
 
     def schedule_tasks(self):
         """
-        Setup scheduled tasks for all registered modules
+        Register supported local schedules for modules.
+
+        Supported formats:
+        - "HH:MM" for a daily local-time run (for example, "03:33")
+        - "every N minutes"
+        - "every N hours"
+
+        Unknown formats are reported and skipped rather than silently
+        pretending that a task has been scheduled.
         """
         print("\n⏰ Scheduling shadow tasks...")
+        schedule.clear("raja_shadow")
 
-        # Schedule 3:33 AM wake-up roar
-        schedule.every().day.at("03:33").do(self.shrine_wake_roar)
-        print("   ✓ 3:33 AM Wake-up Roar scheduled")
+        if not any(module.get("schedule") for module in self.modules.values()):
+            self.register_module("wake_roar", self.shrine_wake_roar, "03:33")
 
-        # Add more schedules as modules are registered
         for name, module in self.modules.items():
-            if module["schedule"]:
-                # Parse schedule and register
-                # This can be expanded with more sophisticated scheduling
-                print(f"   ✓ {name} scheduled: {module['schedule']}")
+            expression = module.get("schedule")
+            if not expression:
+                continue
 
-        print("\n🐱 RAJA SHADOW is now autonomous")
-        print("   Possession complete. Shadow squats deeper.\n")
+            def run_registered(module_name=name, registered=module):
+                try:
+                    result = registered["func"]()
+                    registered["last_run"] = datetime.now().isoformat()
+                    registered["run_count"] += 1
+                    return result
+                except Exception as error:
+                    print(f"❌ Scheduled module {module_name} failed: {error}")
+                    return None
+
+            daily_match = re.fullmatch(r"(\d{2}):(\d{2})", expression)
+            interval_match = re.fullmatch(r"every\s+(\d+)\s+(minute|minutes|hour|hours)", expression, re.I)
+
+            if daily_match:
+                hour, minute = map(int, daily_match.groups())
+                if hour > 23 or minute > 59:
+                    print(f"   ⚠️ Invalid time for {name}: {expression}")
+                    continue
+                job = schedule.every().day.at(expression).do(run_registered)
+            elif interval_match:
+                amount = int(interval_match.group(1))
+                unit = interval_match.group(2).lower()
+                if amount < 1:
+                    print(f"   ⚠️ Invalid interval for {name}: {expression}")
+                    continue
+                job = (schedule.every(amount).minutes if unit.startswith("minute")
+                       else schedule.every(amount).hours).do(run_registered)
+            else:
+                print(f"   ⚠️ Unsupported schedule for {name}: {expression}")
+                continue
+
+            job.tag("raja_shadow")
+            print(f"   ✓ {name} scheduled: {expression}")
+
+        print("\n🐱 RAJA SHADOW schedules registered (local time)")
+        print("   The loop runs only while this process is open.\n")
 
     def run_loop(self):
         """

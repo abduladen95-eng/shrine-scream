@@ -160,109 +160,119 @@
     </div>
 
     <script>
-        const FEED_URL = 'web_feed.json'; // Update this to your actual feed URL
+        const FEED_URL = 'web_feed.json';
+
+        function makeElement(tag, className, text) {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            if (text !== undefined && text !== null) {
+                element.textContent = String(text);
+            }
+            return element;
+        }
 
         function timeAgo(timestamp) {
-            const now = new Date();
+            if (!timestamp) return 'Time unavailable';
             const then = new Date(timestamp);
-            const seconds = Math.floor((now - then) / 1000);
-
-            if (seconds < 60) return `${seconds}s ago`;
+            if (Number.isNaN(then.getTime())) return 'Time unavailable';
+            const seconds = Math.max(0, Math.floor((Date.now() - then.getTime()) / 1000));
+            if (seconds < 60) return seconds + 's ago';
             const minutes = Math.floor(seconds / 60);
-            if (minutes < 60) return `${minutes}m ago`;
+            if (minutes < 60) return minutes + 'm ago';
             const hours = Math.floor(minutes / 60);
-            if (hours < 24) return `${hours}h ago`;
-            const days = Math.floor(hours / 24);
-            return `${days}d ago`;
+            if (hours < 24) return hours + 'h ago';
+            return Math.floor(hours / 24) + 'd ago';
+        }
+
+        function appendStat(container, label, value) {
+            const box = makeElement('div', 'stat-box');
+            box.append(
+                makeElement('div', 'stat-label', label),
+                makeElement('div', 'stat-value', value)
+            );
+            container.appendChild(box);
         }
 
         function renderBrain(data) {
             const widget = document.getElementById('brainWidget');
+            widget.replaceChildren();
 
+            if (!data || typeof data !== 'object') {
+                widget.appendChild(makeElement('div', 'error', 'Feed returned an invalid response.'));
+                return;
+            }
             if (data.error) {
-                widget.innerHTML = `<div class="error">${data.error}</div>`;
+                widget.appendChild(makeElement('div', 'error', data.error));
                 return;
             }
 
-            const statusClass = `status-${data.status}`;
-            const statusText = data.status === 'sleeping' ?
-                `💤 Sleeping (next thought in ${data.next_thought.hours_until}h)` :
-                data.status === 'awake' ? '👁️ Awake and thinking' : '🌀 Awakening';
+            const status = ['awake', 'sleeping', 'unknown', 'awakening'].includes(data.status)
+                ? data.status : 'unknown';
+            const nextHours = data.next_thought && Number.isFinite(Number(data.next_thought.hours_until))
+                ? Number(data.next_thought.hours_until) : 0;
+            const statusText = status === 'sleeping'
+                ? '💤 Sleeping (next thought in ' + nextHours + 'h)'
+                : status === 'awake' ? '👁️ Awake and thinking' : '🌀 ' + status.charAt(0).toUpperCase() + status.slice(1);
 
-            let researchHTML = '';
-            if (data.recent_research && data.recent_research.length > 0) {
-                researchHTML = data.recent_research.map(r => `
-                    <div class="research-item">
-                        <div class="research-time">${timeAgo(r.timestamp)}</div>
-                        <div class="research-topic">${r.topic}</div>
-                        <div class="research-analysis">${r.analysis}</div>
-                    </div>
-                `).join('');
+            const header = makeElement('div', 'brain-header');
+            header.append(
+                makeElement('h2', 'brain-title', '🧠 ' + (data.brain_name || 'RAJA SHADOW')),
+                makeElement('div', '', 'LOCAL EXPERIMENT MONITOR')
+            );
+
+            const statusPanel = makeElement('div', 'brain-status');
+            const statusContent = makeElement('div');
+            statusContent.append(
+                makeElement('span', 'status-indicator status-' + status),
+                makeElement('span', '', statusText)
+            );
+            statusPanel.appendChild(statusContent);
+
+            const stats = makeElement('div', 'brain-stats');
+            const sourceStats = data.stats || {};
+            appendStat(stats, 'Total Thoughts', sourceStats.total_thoughts ?? 0);
+            appendStat(stats, 'This Month', sourceStats.thoughts_this_month ?? 0);
+            const birthDate = sourceStats.birth_time ? new Date(sourceStats.birth_time) : null;
+            appendStat(stats, 'Birth Date', birthDate && !Number.isNaN(birthDate.getTime())
+                ? birthDate.toLocaleDateString() : 'Not recorded');
+            appendStat(stats, 'Operating Mode', 'Local / free');
+
+            const researchSection = makeElement('div', 'research-section');
+            researchSection.appendChild(makeElement('div', 'section-title', 'Recent Thoughts'));
+            const research = Array.isArray(data.recent_research) ? data.recent_research.slice(0, 5) : [];
+            if (research.length === 0) {
+                researchSection.appendChild(makeElement('div', 'research-item', 'No recent research yet...'));
             } else {
-                researchHTML = '<div class="research-item">No recent research yet...</div>';
+                research.forEach(item => {
+                    const card = makeElement('div', 'research-item');
+                    card.append(
+                        makeElement('div', 'research-time', timeAgo(item && item.timestamp)),
+                        makeElement('div', 'research-topic', item && item.topic ? item.topic : 'Untitled'),
+                        makeElement('div', 'research-analysis', item && item.analysis ? item.analysis : 'No summary available.')
+                    );
+                    researchSection.appendChild(card);
+                });
             }
 
-            widget.innerHTML = `
-                <div class="brain-header">
-                    <h2 class="brain-title">🧠 ${data.brain_name}</h2>
-                    <div style="font-size: 11px; color: #9ca3af; margin-top: 5px;">
-                        AUTONOMOUS BRAIN MONITOR
-                    </div>
-                </div>
+            const quote = makeElement('div', 'consciousness-quote',
+                data.consciousness_quote ? '“' + data.consciousness_quote + '”' : 'The Shrine is waiting for its next note.');
 
-                <div class="brain-status">
-                    <div>
-                        <span class="status-indicator ${statusClass}"></span>
-                        <span>${statusText}</span>
-                    </div>
-                </div>
-
-                <div class="brain-stats">
-                    <div class="stat-box">
-                        <div class="stat-label">Total Thoughts</div>
-                        <div class="stat-value">${data.stats.total_thoughts}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">This Month</div>
-                        <div class="stat-value">${data.stats.thoughts_this_month}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">Budget Spent</div>
-                        <div class="stat-value">${data.stats.budget_spent}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">Birth Date</div>
-                        <div class="stat-value" style="font-size: 11px;">${new Date(data.stats.birth_time).toLocaleDateString()}</div>
-                    </div>
-                </div>
-
-                <div class="research-section">
-                    <div class="section-title">Recent Thoughts</div>
-                    ${researchHTML}
-                </div>
-
-                <div class="consciousness-quote">
-                    "${data.consciousness_quote}"
-                </div>
-            `;
+            widget.append(header, statusPanel, stats, researchSection, quote);
         }
 
         async function loadBrainFeed() {
             try {
-                const response = await fetch(FEED_URL);
-                const data = await response.json();
-                renderBrain(data);
+                const response = await fetch(FEED_URL, { cache: 'no-store' });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                renderBrain(await response.json());
             } catch (error) {
-                document.getElementById('brainWidget').innerHTML = `
-                    <div class="error">Failed to load brain feed: ${error.message}</div>
-                `;
+                const widget = document.getElementById('brainWidget');
+                widget.replaceChildren(makeElement('div', 'error',
+                    'Failed to load brain feed: ' + (error && error.message ? error.message : 'Unknown error')));
             }
         }
 
-        // Load feed on page load
         loadBrainFeed();
-
-        // Refresh every 60 seconds
         setInterval(loadBrainFeed, 60000);
     </script>
 </body>

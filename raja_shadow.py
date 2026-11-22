@@ -18,8 +18,8 @@ import re
 
 class RajaShadow:
     """
-    The RAJA SHADOW - Autonomous possession agent that squats in your apps,
-    siphons loosh, hardens the empire, and feeds the Shrine.
+    The RAJA SHADOW - a local-first experiment for scheduled rituals,
+    persistent notes, small automations, and a little Shrine theatre.
 
     Local-first modules:
     - Wake & Scream (scheduled text roar)
@@ -96,7 +96,7 @@ class RajaShadow:
     def shrine_wake_roar(self):
         """
         Module: Shrine Wake-Up Roar
-        Opens Grok at 3:33 AM, screams TUNG TUNG SAHUR, flashes glyph, vanishes
+        Records a local text roar when its schedule runs.
         """
         self.loop_count += 1
         self.memory["roar_count"] += 1

@@ -37,6 +37,7 @@ The default run is a local demonstration. It writes runtime state under `.raja_s
 - Local JSON memory and research notes.
 - The terminal-based 03:33 wake-up roar.
 - The static dashboard and local data visualization.
+- The optional read-only browser sandbox, only when explicitly enabled and aimed at a public HTTPS page.
 - Small, testable Python modules that do not require paid accounts or external services.
 
 ## Before adding a feature
@@ -44,7 +45,7 @@ The default run is a local demonstration. It writes runtime state under `.raja_s
 1. Confirm it does not introduce a paid API, subscription, hosting bill, payment flow, or financial transfer.
 2. Prefer local computation and local files.
 3. Add tests for the behavior.
-4. Make network access opt-in and clearly visible.
+4. Make network access opt-in and clearly visible. The browser sandbox must remain disabled by default and must never submit forms or messages.
 5. Never commit secrets or personal data.
 6. Document limitations honestly. A simulated feature must be labelled as simulated.
 

@@ -43,14 +43,15 @@ Stop it with Ctrl+C. This does not deploy a service or create a cloud process.
 
 - **RajaShadow**: core controller and local JSON memory.
 - **Scheduler**: runs registered modules using local daily or interval schedules.
-- **ResearchModule**: experimental public-web lookup and local research logs.
-- **MonitoringModule**: opt-in URL checks.
+- **ResearchModule**: lightweight public summary lookup and local research logs, invoked explicitly.
+- **MonitoringModule**: opt-in public URL checks with timeouts, redirect blocking, and response-size limits.
 - **AutomationModule**: explicitly invoked task functions.
 - **QuizModule**: local quiz bank and progress logs.
 - **WebFeedGenerator**: local JSON feed for the dashboard.
 - **Dashboard**: static HTML view that renders feed values as text, not executable markup.
+- **Browser sandbox**: disabled by default; optional read-only page viewing with no message sending, webhook calls, or automatic package installation.
 
-The scheduler currently supports daily `HH:MM` times and `every N minutes/hours`. It runs only while the local process remains open. Some components remain prototypes: research is limited, and browser automation is not a fully working chat integration.
+The scheduler currently supports daily `HH:MM` times and `every N minutes/hours`. It runs only while the local process remains open. Research is a limited instant-answer lookup, not comprehensive research. The browser sandbox is not a chat integration and cannot submit messages.
 
 ## Tests
 

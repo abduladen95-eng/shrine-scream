@@ -23,14 +23,18 @@ The former `test_discord.py` contained a literal Discord webhook URL. The file w
 - Replaced dashboard HTML-string rendering with DOM elements and `textContent`, preventing feed values from being interpreted as markup.
 - Removed the dashboard's budget-spend display.
 - Implemented actual local scheduler registration for daily `HH:MM` times and `every N minutes/hours` intervals. Unsupported expressions are reported and skipped.
+- Replaced the old browser-possession module with a disabled-by-default, read-only browser sandbox. Removed automatic package installation and all Discord/Telegram/web-chat message-sending methods.
+- Hardened URL monitoring: only HTTP(S) with standard ports, public DNS/IP destinations, no redirects, bounded response size, and request timeouts.
+- Made the default module demo offline, improved research logging, and changed the Law 11 quiz defaults to emphasize trust and independence rather than dependency.
+- Added offline safety tests for local-address blocking, browser defaults, and quiz content.
 
 ## Remaining limitations and risks
 
-1. The Grok browser routine navigates to a page but does not locate a prompt or submit a message. It should be treated as a navigation demo, not working chat automation.
-2. The research helper in `shadow_modules.py` uses DuckDuckGo Instant Answer data. It is limited and is not a robust search or research pipeline.
-3. URL monitoring and browser automation make network requests when explicitly invoked. Do not point them at logged-in accounts or consequential actions without reviewing the target and behavior first.
+1. The research helper uses DuckDuckGo Instant Answer data. It is limited and is not a robust search or research pipeline.
+2. Public URL monitoring performs DNS resolution and an HTTP request when explicitly invoked. Network defenses reduce risk but are not a substitute for reviewing a target; DNS rebinding and unusual network environments remain considerations.
+3. The optional browser sandbox requires Selenium to be installed separately and a local browser driver. It is disabled by default and only opens public HTTPS pages; browser use has not been runtime-tested.
 4. The Discord webhook may remain exposed in old Git history. Revocation is the reliable immediate mitigation; history rewriting has not been performed.
-5. The project still needs an automated test suite and repeatable local smoke tests.
+5. Offline unit tests now cover core scheduling, dashboard-feed behavior, and module safety, but the suite has not been executed in this environment.
 6. The scheduler supports only the documented formats. Its loop runs only while the local Python process remains open; it is not a hosted service.
 7. The project has not been fully installed, runtime-tested, or deployed as part of this static repository review.
 

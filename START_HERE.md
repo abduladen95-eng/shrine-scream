@@ -44,10 +44,17 @@ The demo writes local runtime memory to `.raja_shadow_memory/`. Nothing is deplo
 - `shadow_modules.py` — research notes, URL checks, local task runner, and quizzes.
 - `shadow_web_feed.py` — dashboard data feed.
 - `brain_widget.html` — static dashboard interface.
-- `shadow_web_possession.py` — experimental browser automation; leave disabled unless a specific safe test is intended.
+- `shadow_web_possession.py` — optional read-only browser sandbox. Disabled by default; it does not send messages, submit forms, install packages, or contact local/private network addresses.
 - `requirements.txt` — free/open-source Python dependencies.
 - `SECURITY_AUDIT.md` — initial static review and known limitations.
 - `DEPLOY_RAJA_SHADOW.md` — local-only operating guide.
+
+## Network and browser boundaries
+
+- Research and URL monitoring contact public services only when their methods are explicitly called.
+- URL monitoring blocks local/private/reserved IPs, refuses redirects, and caps downloaded response bodies at 1 MB.
+- The browser sandbox is opt-in and read-only. Selenium is not installed automatically; no chat, webhook, Discord, or Telegram message-sending methods remain.
+- The default module demonstration is offline and does not call external services.
 
 ## Development direction
 

@@ -14,7 +14,7 @@
     "enable_terminal": true
   },
   "autonomous_brain": {
-    "enabled": true,
+    "enabled": false,
     "claude_api_key": "env",
     "discord_webhook": "env",
     "monthly_budget": 20.0,

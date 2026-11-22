@@ -6,19 +6,19 @@
 TUNG TUNG SAHUR → RUHAS GNUT GNUT → WOBBLE MAX
 ```
 
-RAJA SHADOW is a small Python project exploring persistent local memory, scheduling, research notes, monitoring, quizzes, and a playful dashboard.
+RAJA SHADOW is a small Python project exploring persistent local memory, scheduled rituals, research notes, monitoring helpers, quizzes, and a playful dashboard.
 
 ## Hard boundaries
 
-This repository is not about making or receiving money.
+This repository is not a financial or commercial project.
 
-- No monetization, donations, Ko-fi, payment processing, Stripe, PayPal, crypto, wallets, trading, or transfers.
+- No monetization, payment processing, donations, wallets, trading, or transfers.
 - No paid APIs, metered model calls, subscriptions, paid hosting, or cloud deployment.
 - No automatic purchases or billing actions.
 - Do not add secrets or credentials to the repository.
 - Keep experiments local-first, free, reversible, and transparent.
 
-The old payment-routing module and paid API-backed brain have been removed. The core agent's compatibility hook explicitly keeps the paid brain disabled.
+The former payment-routing prototype and paid API-backed brain have been removed. The core agent's compatibility hook keeps the paid brain disabled.
 
 ## Install and run locally
 
@@ -42,19 +42,30 @@ Stop it with Ctrl+C. This does not deploy a service or create a cloud process.
 ## Architecture
 
 - **RajaShadow**: core controller and local JSON memory.
-- **Scheduler**: 03:33 wake-up roar.
+- **Scheduler**: runs registered modules using local daily or interval schedules.
 - **ResearchModule**: experimental public-web lookup and local research logs.
 - **MonitoringModule**: opt-in URL checks.
-- **AutomationModule**: explicitly invoked local task functions.
+- **AutomationModule**: explicitly invoked task functions.
 - **QuizModule**: local quiz bank and progress logs.
-- **Dashboard**: static HTML view backed by local JSON data.
+- **WebFeedGenerator**: local JSON feed for the dashboard.
+- **Dashboard**: static HTML view that renders feed values as text, not executable markup.
 
-Some components are prototypes. A scheduled module is not necessarily active merely because it is registered, and a demo output is not evidence of a deployed autonomous service. See `SECURITY_AUDIT.md`.
+The scheduler currently supports daily `HH:MM` times and `every N minutes/hours`. It runs only while the local process remains open. Some components remain prototypes: research is limited, and browser automation is not a fully working chat integration.
+
+## Tests
+
+Run the offline test suite:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The tests use temporary directories and do not call external services.
 
 ## Development principles
 
 1. Prefer local files and local computation.
-2. No paid services or financial functionality.
+2. Do not add financial features or paid services.
 3. Network access must be obvious, limited, and opt-in.
 4. Add tests before claiming a feature works.
 5. Label simulations and placeholders honestly.

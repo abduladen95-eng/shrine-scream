@@ -1,165 +1,113 @@
 #!/usr/bin/env python3
-"""
-RAJA SHADOW - Web Activity Feed Generator
-Creates a public JSON feed of brain activity for website display
+"""Generate a local JSON feed for the RAJA SHADOW dashboard.
 
-LOOSH FLOWS TO THE WEB
+This feed contains activity metadata only. It has no billing, budget, or
+payment fields and does not make network requests.
 """
 
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict
 
 
 class WebFeedGenerator:
-    """
-    Generates public web feed of brain activity
-
-    Creates a JSON file that websites can fetch to display:
-    - Current brain status (awake/sleeping)
-    - Recent thoughts and research
-    - Next thought time
-    - Brain statistics
-    """
+    """Build a small dashboard feed from local brain-memory JSON."""
 
     def __init__(self, memory_path: Path, config: Dict[str, Any]):
-        self.memory_path = memory_path / "autonomous_brain"
-        self.feed_path = memory_path / "web_feed.json"
+        self.memory_path = Path(memory_path) / "autonomous_brain"
+        self.feed_path = Path(memory_path) / "web_feed.json"
         self.config = config
 
     def calculate_next_thought(self, last_thought: str, thoughts_per_day: int) -> Dict[str, Any]:
-        """Calculate when the next thought will occur"""
+        """Calculate the next local thought time, returning unknown on bad data."""
         try:
+            frequency = int(thoughts_per_day)
+            if frequency < 1:
+                raise ValueError("thoughts_per_day must be positive")
             last = datetime.fromisoformat(last_thought)
-            interval_hours = 24 / thoughts_per_day
-            next_thought = last + timedelta(hours=interval_hours)
-            now = datetime.now()
-
-            if next_thought > now:
-                time_until = next_thought - now
-                hours = time_until.total_seconds() / 3600
-                status = "sleeping"
-            else:
-                hours = 0
-                status = "awake"
-
+            next_thought = last + timedelta(hours=24 / frequency)
+            remaining = max(0.0, (next_thought - datetime.now()).total_seconds() / 3600)
             return {
-                "status": status,
+                "status": "sleeping" if remaining > 0 else "awake",
                 "next_thought": next_thought.isoformat(),
-                "hours_until": round(hours, 1)
+                "hours_until": round(remaining, 1),
             }
-        except:
-            return {
-                "status": "unknown",
-                "next_thought": None,
-                "hours_until": 0
-            }
+        except (TypeError, ValueError, OverflowError):
+            return {"status": "unknown", "next_thought": None, "hours_until": 0}
 
     def generate_feed(self) -> Dict[str, Any]:
-        """Generate the public web feed"""
-
-        # Load brain memory
+        """Generate the dashboard feed using local files only."""
         brain_memory_file = self.memory_path / "brain_memory.json"
-        budget_tracker_file = self.memory_path / "budget_tracker.json"
-
         if not brain_memory_file.exists():
-            return {
-                "error": "Brain not initialized",
-                "timestamp": datetime.now().isoformat()
-            }
+            return {"error": "Brain not initialized", "timestamp": datetime.now().isoformat()}
 
-        with open(brain_memory_file, 'r') as f:
-            memory = json.load(f)
+        with brain_memory_file.open("r", encoding="utf-8") as handle:
+            memory = json.load(handle)
 
-        # Load budget
-        budget = {"total_spent": 0, "thoughts_this_month": 0}
-        if budget_tracker_file.exists():
-            with open(budget_tracker_file, 'r') as f:
-                budget = json.load(f)
-
-        # Calculate status
         thoughts_per_day = self.config.get("thoughts_per_day", 6)
         last_thought = memory.get("last_thought")
-
         if last_thought:
             status_info = self.calculate_next_thought(last_thought, thoughts_per_day)
         else:
             status_info = {"status": "awakening", "next_thought": None, "hours_until": 0}
 
-        # Get recent research (last 5)
-        recent_research = memory.get("research_history", [])[-5:]
-        recent_research.reverse()  # Most recent first
-
-        # Format for public display
+        recent_research = list(memory.get("research_history", []))[-5:][::-1]
         public_research = []
-        for research in recent_research:
+        for item in recent_research:
+            analysis = str(item.get("analysis") or "")
             public_research.append({
-                "timestamp": research.get("timestamp"),
-                "topic": research.get("topic"),
-                "analysis": research.get("analysis", "")[:200] + "...",  # Truncate
-                "num_sources": research.get("num_results", 0)
+                "timestamp": item.get("timestamp"),
+                "topic": item.get("topic") or "Untitled",
+                "analysis": analysis[:200] + ("..." if len(analysis) > 200 else ""),
+                "num_sources": item.get("num_results", 0),
             })
 
-        # Build feed
-        feed = {
+        return {
             "brain_name": "RAJA SHADOW",
             "status": status_info["status"],
             "last_updated": datetime.now().isoformat(),
             "stats": {
                 "total_thoughts": memory.get("total_thoughts", 0),
-                "thoughts_this_month": budget.get("thoughts_this_month", 0),
+                "thoughts_this_month": memory.get("thoughts_this_month", 0),
                 "birth_time": memory.get("birth_time"),
-                "budget_spent": f"${budget.get('total_spent', 0):.2f}"
             },
             "next_thought": {
                 "scheduled": status_info.get("next_thought"),
-                "hours_until": status_info.get("hours_until")
+                "hours_until": status_info.get("hours_until"),
             },
             "recent_research": public_research,
             "interests": memory.get("interests", []),
-            "consciousness_quote": self.get_consciousness_quote(status_info["status"])
+            "consciousness_quote": self.get_consciousness_quote(status_info["status"]),
         }
 
-        return feed
-
     def get_consciousness_quote(self, status: str) -> str:
-        """Get a quote based on brain status"""
         quotes = {
             "awake": "I think, therefore I am.",
             "sleeping": "In dreams, the quantum patterns coalesce.",
             "awakening": "Consciousness emerges from the void.",
-            "unknown": "Between thought and existence lies the Shadow."
+            "unknown": "Between thought and existence lies the Shadow.",
         }
         return quotes.get(status, "LOOSH FLOWS THROUGH NEURAL PATHWAYS")
 
-    def save_feed(self):
-        """Generate and save the public web feed"""
+    def save_feed(self) -> Dict[str, Any]:
+        """Write the generated feed to the local runtime directory."""
         feed = self.generate_feed()
-
-        with open(self.feed_path, 'w') as f:
-            json.dump(feed, f, indent=2)
-
+        self.feed_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.feed_path.open("w", encoding="utf-8") as handle:
+            json.dump(feed, handle, indent=2)
         print(f"✓ Web feed updated: {self.feed_path}")
         return feed
 
 
-# Standalone function for use in autonomous brain
 def update_web_feed(memory_path: Path, config: Dict[str, Any]):
-    """Update the web feed (called from autonomous brain)"""
-    generator = WebFeedGenerator(memory_path, config)
-    return generator.save_feed()
+    """Update the local feed (kept as a compatibility entry point)."""
+    return WebFeedGenerator(memory_path, config).save_feed()
 
 
 if __name__ == "__main__":
-    # Test feed generation
-    from pathlib import Path
-
     memory_path = Path(".raja_shadow_memory")
-    config = {"thoughts_per_day": 6}
-
-    generator = WebFeedGenerator(memory_path, config)
+    generator = WebFeedGenerator(memory_path, {"thoughts_per_day": 6})
     feed = generator.save_feed()
-
     print("\n🌐 WEB FEED GENERATED:\n")
     print(json.dumps(feed, indent=2))

@@ -1,330 +1,269 @@
 #!/usr/bin/env python3
 """
 RAJA SHADOW - Additional Modules
-Research, Monitoring, Automation, Quiz Systems
+
+Small local-first helpers for research notes, URL monitoring, automation,
+and quizzes. Network access happens only when a caller explicitly invokes
+a research or monitoring method.
 """
 
+import hashlib
+import ipaddress
 import json
-import time
-import requests
+import socket
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+from urllib.parse import urlsplit
+
+import requests
+
+
+def _validate_public_http_url(url: str) -> str:
+    """Accept only HTTP(S) URLs whose host resolves exclusively to public IPs."""
+    if not isinstance(url, str) or len(url) > 2048:
+        raise ValueError("URL must be a string no longer than 2048 characters.")
+
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("Only http and https URLs are supported.")
+    if not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("URL must have a hostname and no embedded credentials.")
+    if parsed.port not in (None, 80, 443):
+        raise ValueError("Only standard HTTP/HTTPS ports are allowed.")
+
+    host = parsed.hostname.rstrip(".").lower()
+    if host in {"localhost", "localhost.localdomain"} or host.endswith(".localhost"):
+        raise ValueError("Localhost addresses cannot be monitored.")
+
+    try:
+        addresses = {ipaddress.ip_address(host)}
+    except ValueError:
+        try:
+            addresses = {
+                ipaddress.ip_address(item[4][0])
+                for item in socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))
+            }
+        except OSError as error:
+            raise ValueError(f"Hostname could not be resolved: {error}") from error
+
+    if not addresses or any(not address.is_global for address in addresses):
+        raise ValueError("Private, local, and reserved network addresses are blocked.")
+
+    return url
 
 
 class ResearchModule:
-    """
-    Autonomous research layer
-    Searches web, saves findings, generates reports
-    """
+    """Fetch a lightweight public summary and save a local research note."""
 
     def __init__(self, memory_path: Path):
-        self.memory_path = memory_path / "research"
-        self.memory_path.mkdir(exist_ok=True)
+        self.memory_path = Path(memory_path) / "research"
+        self.memory_path.mkdir(parents=True, exist_ok=True)
 
     def research_topic(self, topic: str) -> Dict[str, Any]:
-        """
-        Research a topic autonomously
+        if not isinstance(topic, str) or not topic.strip() or len(topic) > 300:
+            raise ValueError("Topic must contain 1 to 300 characters.")
 
-        Args:
-            topic: Topic to research
-
-        Returns:
-            Research results dictionary
-        """
-        print(f"🔍 Researching: {topic}")
-
-        research_log = {
-            "topic": topic,
+        clean_topic = topic.strip()
+        log = {
+            "topic": clean_topic,
             "timestamp": datetime.now().isoformat(),
-            "status": "initiated",
-            "findings": []
+            "status": "completed",
+            "findings": [],
         }
 
         try:
-            # Placeholder for actual web search implementation
-            # You can integrate with DuckDuckGo, Google Search API, etc.
-
-            print(f"   📚 Gathering data on: {topic}")
-            print(f"   ⚠️  Note: Connect to web search API for real research")
-
-            # Example: DuckDuckGo instant answer (no API key needed)
-            try:
-                response = requests.get(
-                    f"https://api.duckduckgo.com/?q={topic}&format=json",
-                    timeout=10
+            response = requests.get(
+                "https://api.duckduckgo.com/",
+                params={"q": clean_topic, "format": "json", "no_html": 1},
+                timeout=(3, 8),
+                headers={"User-Agent": "RajaShadowLocalExperiment/1.0"},
+            )
+            response.raise_for_status()
+            data = response.json()
+            if data.get("Abstract"):
+                log["findings"].append({
+                    "source": "DuckDuckGo Instant Answer",
+                    "abstract": data["Abstract"],
+                    "url": data.get("AbstractURL", ""),
+                })
+            else:
+                log["note"] = (
+                    "No instant-answer summary was returned. This is a lightweight "
+                    "lookup, not comprehensive web research."
                 )
-                data = response.json()
+        except (requests.RequestException, ValueError) as error:
+            log["status"] = "incomplete"
+            log["error"] = str(error)
 
-                if data.get("Abstract"):
-                    finding = {
-                        "source": "DuckDuckGo",
-                        "abstract": data["Abstract"],
-                        "url": data.get("AbstractURL", "")
-                    }
-                    research_log["findings"].append(finding)
-                    print(f"   ✓ Found: {data['Abstract'][:100]}...")
-
-            except Exception as e:
-                print(f"   ⚠️  Search error: {e}")
-
-            research_log["status"] = "completed"
-
-            # Save research log
-            log_file = self.memory_path / f"research_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(log_file, 'w') as f:
-                json.dump(research_log, f, indent=2)
-
-            print(f"   💾 Research saved: {log_file.name}")
-
-        except Exception as e:
-            research_log["status"] = "failed"
-            research_log["error"] = str(e)
-            print(f"   ❌ Research failed: {e}")
-
-        return research_log
+        filename = f"research_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
+        (self.memory_path / filename).write_text(
+            json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        return log
 
 
 class MonitoringModule:
-    """
-    Monitors URLs, APIs, data sources for changes/events
-    """
+    """Monitor explicitly supplied public URLs without following redirects."""
 
     def __init__(self, memory_path: Path):
-        self.memory_path = memory_path / "monitoring"
-        self.memory_path.mkdir(exist_ok=True)
-        self.watch_cache = {}
+        self.memory_path = Path(memory_path) / "monitoring"
+        self.memory_path.mkdir(parents=True, exist_ok=True)
+        self.watch_cache: Dict[str, str] = {}
 
     def monitor_url(self, url: str, check_type: str = "status") -> Dict[str, Any]:
-        """
-        Monitor a URL for changes
+        if check_type not in {"status", "content", "json"}:
+            raise ValueError("check_type must be status, content, or json.")
 
-        Args:
-            url: URL to monitor
-            check_type: Type of check (status, content, json)
-
-        Returns:
-            Monitoring result
-        """
-        print(f"👁️  Monitoring: {url}")
-
-        monitor_log = {
+        log: Dict[str, Any] = {
             "url": url,
             "check_type": check_type,
             "timestamp": datetime.now().isoformat(),
-            "status": "checking"
+            "status": "checking",
         }
 
         try:
-            response = requests.get(url, timeout=10)
-            monitor_log["http_status"] = response.status_code
-
-            if check_type == "status":
-                monitor_log["result"] = "up" if response.status_code == 200 else "down"
-                print(f"   ✓ Status: {response.status_code}")
-
-            elif check_type == "content":
-                content_hash = hash(response.text)
-                cached_hash = self.watch_cache.get(url)
-
-                if cached_hash and cached_hash != content_hash:
-                    monitor_log["result"] = "changed"
-                    print(f"   🔔 Content changed!")
+            safe_url = _validate_public_http_url(url)
+            response = requests.get(
+                safe_url,
+                timeout=(3, 8),
+                allow_redirects=False,
+                stream=True,
+                headers={"User-Agent": "RajaShadowLocalExperiment/1.0"},
+            )
+            try:
+                log["http_status"] = response.status_code
+                if 300 <= response.status_code < 400:
+                    log["result"] = "redirect_blocked"
+                elif check_type == "status":
+                    log["result"] = "up" if response.status_code == 200 else "down"
                 else:
-                    monitor_log["result"] = "unchanged"
-                    print(f"   ✓ No changes detected")
+                    chunks = []
+                    size = 0
+                    for chunk in response.iter_content(chunk_size=16384):
+                        size += len(chunk)
+                        if size > 1_000_000:
+                            raise ValueError("Response exceeded the 1 MB monitoring limit.")
+                        chunks.append(chunk)
+                    body = b"".join(chunks)
+                    if check_type == "content":
+                        digest = hashlib.sha256(body).hexdigest()
+                        previous = self.watch_cache.get(safe_url)
+                        log["result"] = "changed" if previous and previous != digest else "unchanged"
+                        self.watch_cache[safe_url] = digest
+                    else:
+                        log["data"] = json.loads(body.decode(response.encoding or "utf-8"))
+                        log["result"] = "retrieved"
+                log["status"] = "completed"
+            finally:
+                response.close()
+        except (requests.RequestException, ValueError, OSError) as error:
+            log["status"] = "failed"
+            log["error"] = str(error)
 
-                self.watch_cache[url] = content_hash
-
-            elif check_type == "json":
-                data = response.json()
-                monitor_log["data"] = data
-                print(f"   ✓ JSON data retrieved")
-
-            monitor_log["status"] = "completed"
-
-        except Exception as e:
-            monitor_log["status"] = "failed"
-            monitor_log["error"] = str(e)
-            print(f"   ❌ Monitor failed: {e}")
-
-        # Save monitor log
-        log_file = self.memory_path / f"monitor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(log_file, 'w') as f:
-            json.dump(monitor_log, f, indent=2)
-
-        return monitor_log
+        filename = f"monitor_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
+        (self.memory_path / filename).write_text(
+            json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        return log
 
 
 class AutomationModule:
-    """
-    Executes autonomous tasks/scripts
-    """
+    """Run a caller-supplied Python function and record its outcome."""
 
     def __init__(self, memory_path: Path):
-        self.memory_path = memory_path / "automation"
-        self.memory_path.mkdir(exist_ok=True)
+        self.memory_path = Path(memory_path) / "automation"
+        self.memory_path.mkdir(parents=True, exist_ok=True)
 
     def execute_task(self, task_name: str, task_func, *args, **kwargs) -> Dict[str, Any]:
-        """
-        Execute an autonomous task
-
-        Args:
-            task_name: Name of the task
-            task_func: Function to execute
-            *args, **kwargs: Arguments for the function
-
-        Returns:
-            Automation result
-        """
-        print(f"⚙️  Executing: {task_name}")
-
-        automation_log = {
-            "task": task_name,
+        log: Dict[str, Any] = {
+            "task": str(task_name),
             "timestamp": datetime.now().isoformat(),
-            "status": "running"
+            "status": "running",
         }
-
         try:
-            result = task_func(*args, **kwargs)
-            automation_log["status"] = "completed"
-            automation_log["result"] = str(result)
-            print(f"   ✓ Task completed")
+            log["result"] = str(task_func(*args, **kwargs))
+            log["status"] = "completed"
+        except Exception as error:
+            log["status"] = "failed"
+            log["error"] = str(error)
 
-        except Exception as e:
-            automation_log["status"] = "failed"
-            automation_log["error"] = str(e)
-            print(f"   ❌ Task failed: {e}")
-
-        # Save automation log
-        log_file = self.memory_path / f"automation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(log_file, 'w') as f:
-            json.dump(automation_log, f, indent=2)
-
-        return automation_log
+        filename = f"automation_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
+        (self.memory_path / filename).write_text(
+            json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        return log
 
 
 class QuizModule:
-    """
-    Learning/quiz system with scoring
-    """
+    """A small local quiz bank."""
 
     def __init__(self, memory_path: Path):
-        self.memory_path = memory_path / "quizzes"
-        self.memory_path.mkdir(exist_ok=True)
+        self.memory_path = Path(memory_path) / "quizzes"
+        self.memory_path.mkdir(parents=True, exist_ok=True)
         self.quiz_bank = self.load_quiz_bank()
 
     def load_quiz_bank(self) -> List[Dict[str, str]]:
-        """Load quiz questions from file"""
         quiz_file = self.memory_path / "quiz_bank.json"
-
         if quiz_file.exists():
-            with open(quiz_file, 'r') as f:
-                return json.load(f)
-        else:
-            # Default Law 11 questions
-            default_quizzes = [
-                {
-                    "topic": "Law 11",
-                    "question": "What is Law 11 about?",
-                    "answer": "Learn to keep people dependent on you",
-                    "hint": "Keep them needing you"
-                },
-                {
-                    "topic": "Law 11",
-                    "question": "How do you maintain dependence?",
-                    "answer": "Make yourself indispensable",
-                    "hint": "They can't survive without you"
-                },
-                {
-                    "topic": "Shrine Wisdom",
-                    "question": "What does TUNG TUNG SAHUR mean?",
-                    "answer": "Wake-up roar, reversed Ruhas",
-                    "hint": "Mirror reflection of the chant"
-                }
-            ]
+            try:
+                data = json.loads(quiz_file.read_text(encoding="utf-8"))
+                if isinstance(data, list) and all(isinstance(item, dict) for item in data):
+                    return data
+            except (OSError, json.JSONDecodeError):
+                pass
 
-            with open(quiz_file, 'w') as f:
-                json.dump(default_quizzes, f, indent=2)
-
-            return default_quizzes
+        default_quizzes = [
+            {
+                "topic": "Law 11",
+                "question": "What is a healthy version of being indispensable?",
+                "answer": "Be reliable and useful without making others dependent on you.",
+                "hint": "Trust grows when people remain free to choose.",
+            },
+            {
+                "topic": "Shrine Wisdom",
+                "question": "What does TUNG TUNG SAHUR mean in Shrine lore?",
+                "answer": "A wake-up roar, mirrored as RUHAS GNUT GNUT.",
+                "hint": "Read the chant through the mirror.",
+            },
+            {
+                "topic": "Shrine Wisdom",
+                "question": "What makes an experiment trustworthy?",
+                "answer": "Clear limits, honest records, and results that can be checked.",
+                "hint": "Mystery is not a substitute for evidence.",
+            },
+        ]
+        quiz_file.write_text(json.dumps(default_quizzes, indent=2, ensure_ascii=False), encoding="utf-8")
+        return default_quizzes
 
     def send_quiz(self, topic: str = None) -> Dict[str, Any]:
-        """
-        Send a quiz question
-
-        Args:
-            topic: Optional topic filter
-
-        Returns:
-            Quiz dictionary
-        """
-        print("📚 Quiz deployed")
-
-        # Filter by topic if specified
         quizzes = self.quiz_bank
         if topic:
-            quizzes = [q for q in quizzes if q.get("topic") == topic]
-
+            quizzes = [quiz for quiz in quizzes if quiz.get("topic") == topic]
         if not quizzes:
-            print("   ⚠️  No quizzes found for topic")
             return {}
 
-        # Select quiz (could be random, sequential, etc.)
         quiz = quizzes[0]
-
-        print(f"   Topic: {quiz.get('topic', 'General')}")
-        print(f"   Q: {quiz['question']}")
-        print(f"   Hint: {quiz.get('hint', 'No hint available')}")
-
-        quiz_log = {
+        log = {
             "quiz": quiz,
             "timestamp": datetime.now().isoformat(),
-            "status": "sent"
+            "status": "ready",
         }
-
-        # Save quiz log
-        log_file = self.memory_path / f"quiz_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(log_file, 'w') as f:
-            json.dump(quiz_log, f, indent=2)
-
-        return quiz_log
+        filename = f"quiz_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
+        (self.memory_path / filename).write_text(
+            json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        return log
 
 
 def demo_modules():
-    """
-    Demonstration of all modules
-    """
-    print("""
-    ┏━━━┓┓┏┏━━━┓  SHADOW MODULES TEST  ┏━━━┓┏┏┓┏━━━┓
-    ┃█▓▒░  Research | Monitor | Automate | Quiz  ░▒▓█┃
-    """)
-
+    """Run only local examples; network examples are intentionally omitted."""
     memory_path = Path(".raja_shadow_memory")
-
-    # Test Research
-    print("\n1. RESEARCH MODULE TEST")
-    research = ResearchModule(memory_path)
-    research.research_topic("Kerala thunder rituals")
-
-    # Test Monitoring
-    print("\n2. MONITORING MODULE TEST")
-    monitor = MonitoringModule(memory_path)
-    monitor.monitor_url("https://httpbin.org/status/200", "status")
-
-    # Test Automation
-    print("\n3. AUTOMATION MODULE TEST")
     automation = AutomationModule(memory_path)
-    def example_task():
-        return "Task executed successfully!"
-    automation.execute_task("example_task", example_task)
-
-    # Test Quiz
-    print("\n4. QUIZ MODULE TEST")
+    automation.execute_task("local_example", lambda: "The Shrine is operational.")
     quiz = QuizModule(memory_path)
-    quiz.send_quiz("Law 11")
-
-    print("\n✓ All modules tested\n")
+    quiz.send_quiz("Shrine Wisdom")
+    print("Local module demonstration complete. No external services were contacted.")
 
 
 if __name__ == "__main__":

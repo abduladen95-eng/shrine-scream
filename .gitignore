@@ -1,6 +1,19 @@
 node_modules/
 .env
+.env.*
+!.env.example
 setup_brain_env.sh
 start_brain.bat
 __pycache__/
 *.pyc
+
+# Local configuration and runtime state
+shadow_config.json
+.raja_shadow_memory/
+*.log
+brain.log
+shadow.log
+
+# Local browser/session artifacts
+.selenium/
+.browser-profile/

@@ -8,6 +8,8 @@ already installed and a human explicitly opts in, it can open a public HTTPS
 page for visual inspection.
 """
 
+import ipaddress
+import socket
 from urllib.parse import urlsplit
 
 
@@ -48,10 +50,20 @@ class WebPossession:
         if parsed.scheme != "https" or not parsed.hostname:
             raise ValueError("Only public HTTPS pages are supported.")
         host = parsed.hostname.lower().rstrip(".")
-        if host in {"localhost", "localhost.localdomain"} or host.endswith(".localhost"):
-            raise ValueError("Local addresses are not allowed.")
         if parsed.username or parsed.password:
             raise ValueError("URLs containing embedded credentials are not allowed.")
+        try:
+            addresses = {ipaddress.ip_address(host)}
+        except ValueError:
+            try:
+                addresses = {
+                    ipaddress.ip_address(item[4][0])
+                    for item in socket.getaddrinfo(host, 443)
+                }
+            except OSError as error:
+                raise ValueError(f"Hostname could not be resolved: {error}") from error
+        if not addresses or any(not address.is_global for address in addresses):
+            raise ValueError("Private, local, and reserved network addresses are blocked.")
         return url
 
     def open_page(self, url):

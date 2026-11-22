@@ -40,7 +40,7 @@ The demo writes local runtime memory to `.raja_shadow_memory/`. Nothing is deplo
 
 ## Main files
 
-- `raja_shadow.py` — local core, JSON memory, and 03:33 scheduler.
+- `raja_shadow.py` — local core, JSON memory, and daily/interval scheduler.
 - `shadow_modules.py` — research notes, URL checks, local task runner, and quizzes.
 - `shadow_web_feed.py` — dashboard data feed.
 - `brain_widget.html` — static dashboard interface.

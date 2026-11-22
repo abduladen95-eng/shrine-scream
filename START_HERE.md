@@ -54,3 +54,23 @@ The demo writes local runtime memory to `.raja_shadow_memory/`. Nothing is deplo
 Build a coherent local Shrine workspace with persistent memory, searchable research notes, a clear dashboard, and small tested modules. Be honest about what is implemented versus imagined. Prefer local computation and avoid credentials wherever possible.
 
 **Keep it weird. Keep it free. Keep it local.**
+
+## Run the offline checks
+
+From the repository folder, install the listed Python dependencies and run:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The core tests use temporary folders and do not call external services.
+
+## Local scheduler formats
+
+Modules can be registered with one of these schedule strings:
+
+- `03:33` — once per day at 3:33 AM local machine time
+- `every 15 minutes` — repeat every 15 minutes
+- `every 2 hours` — repeat every 2 hours
+
+The scheduler runs only while the local Python process is open. Unsupported schedule text is skipped with a warning.

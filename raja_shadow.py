@@ -241,55 +241,14 @@ JANITOR RIDES
 
 
     def _maybe_start_brain(self):
-        """Start AutonomousBrain in a daemon thread when configured."""
-        config_path = Path(self.shrine_path) / "shadow_config.json"
-        if not config_path.exists():
-            return
-        try:
-            with open(config_path, "r") as f:
-                raw = json.load(f)
-        except Exception as e:
-            print(f"⚠️  Could not read shadow_config.json: {e}")
-            return
+        """Paid API-backed brain intentionally disabled.
 
-        brain_cfg = raw.get("autonomous_brain") or {}
-        if not brain_cfg.get("enabled"):
-            return
-
-        try:
-            from shadow_autonomous_brain import AutonomousBrain, load_brain_config
-        except ImportError:
-            # load_brain_config may not exist on older copies — fall back
-            try:
-                from shadow_autonomous_brain import AutonomousBrain
-                load_brain_config = None
-            except ImportError as e:
-                print(f"⚠️  AutonomousBrain import failed: {e}")
-                return
-
-        try:
-            if load_brain_config:
-                config = load_brain_config(str(config_path))
-            else:
-                config = dict(brain_cfg)
-                if config.get("claude_api_key") in (None, "", "env"):
-                    config["claude_api_key"] = os.getenv("ANTHROPIC_API_KEY")
-                if config.get("discord_webhook") in (None, "", "env"):
-                    config["discord_webhook"] = os.getenv("DISCORD_WEBHOOK")
-
-            self.brain = AutonomousBrain(self.memory_path, config)
-
-            def run_brain():
-                try:
-                    self.brain.run_autonomous_loop()
-                except Exception as e:
-                    print(f"❌ Brain thread crashed: {e}")
-
-            t = threading.Thread(target=run_brain, name="raja-autonomous-brain", daemon=True)
-            t.start()
-            print("🧠 Autonomous brain thread started")
-        except Exception as e:
-            print(f"⚠️  Failed to start autonomous brain: {e}")
+        The Shrine is a no-paid-services experiment. This method remains as a
+        compatibility hook but never loads credentials, imports an LLM SDK,
+        starts a background agent, or makes network requests.
+        """
+        self.brain = None
+        return
 
     def schedule_tasks(self):
         """
